@@ -20,4 +20,12 @@ app.get("/", (req, res) => {
   res.send("Chat API is running!");
 });
 
+// Example route to test JWT
+app.post("/generate-token", (req, res) => {
+  const token = jwt.sign({ userId: "12345" }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  res.json({ token });
+});
+
+app.listen(5000, () => console.log("Server running on port 5000"));
+
 module.exports = app;
