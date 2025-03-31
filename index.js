@@ -1,31 +1,60 @@
-require("dotenv").config();
+require("dotenv").config(); // Load environment variables
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const http = require("http");
+const socketIo = require("socket.io");
+const authRoutes = require("./routes/authRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const messageRoutes = require("./routes/messageRoutes");
 
+// Initialize Express app
 const app = express();
-app.use(cors());
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+// Middleware
 app.use(express.json());
+app.use(cors());
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log("✅ MongoDB Connected"))
-.catch(err => console.error("❌ MongoDB Connection Error:", err));
+mongoose
+  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-// Sample route
+// WebSocket connection for real-time messaging
+io.on("connection", (socket) => {
+  console.log("⚡ New WebSocket connection:", socket.id);
+
+  socket.on("joinChat", (chatId) => {
+    socket.join(chatId);
+    console.log(`User joined chat: ${chatId}`);
+  });
+
+  socket.on("sendMessage", (message) => {
+    io.to(message.chatId).emit("receiveMessage", message);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
+  });
+});
+
+// API Routes
+app.use("/auth", authRoutes);
+app.use("/chats", chatRoutes);
+app.use("/messages", messageRoutes);
+
+// Default route
 app.get("/", (req, res) => {
   res.send("Chat API is running!");
 });
 
-// Example route to test JWT
-app.post("/generate-token", (req, res) => {
-  const token = jwt.sign({ userId: "12345" }, process.env.JWT_SECRET, { expiresIn: "7d" });
-  res.json({ token });
-});
-
-app.listen(5000, () => console.log("Server running on port 5000"));
-
-module.exports = app;
+// Start the server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
